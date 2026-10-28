@@ -1,0 +1,32 @@
+name: solve
+on:
+  workflow_dispatch:
+    inputs:
+      run_tag: {description: tag, required: true}
+      nvars: {description: variables, required: true}
+      seconds: {description: time limit, required: true}
+jobs:
+  race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q python-sat
+      - run: |
+          case $(( ${{ matrix.idx }} % 4 )) in
+            0) S=maplechrono;; 1) S=maplecm;; 2) S=kissat404;; 3) S=cadical195;;
+          esac
+          B=$(( ${{ matrix.idx }} * 4 ))
+          JOBS="maplechrono:$((B+1)),maplecm:$((B+2)),$S:$((B+3)),maplechrono:$((B+4))"
+          if [ ${{ matrix.idx }} -eq 0 ]; then JOBS="maplechrono:0,maplecm:0,maplechrono:11,maplecm:23"; fi
+          JOBS=$JOBS timeout $(( ${{ inputs.seconds }} + 30 )) python3 solve_race.py frags.json ${{ inputs.nvars }} ${{ inputs.seconds }} out.txt || true
+          cat out.txt 2>/dev/null | head -c 20; echo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sol-${{ inputs.run_tag }}-${{ matrix.idx }}
+          path: out.txt
+          if-no-files-found: ignore
